@@ -50,17 +50,23 @@ with tab_novo:
             categoria = st.selectbox("Categoria", CATEGORIAS)
         with col2:
             descricao = st.text_input("Descrição")
-            valor_input = st.text_input("Valor (Digite apenas os números, ex: 1500 para R$ 15,00)")
+            # Campo manual que aceita vírgula
+            valor_input = st.text_input("Valor (R$)", placeholder="Ex: 15,50")
             
         if st.form_submit_button("Salvar Gasto"):
-            apenas_numeros = ''.join(filter(str.isdigit, str(valor_input)))
-            if apenas_numeros == "":
-                st.error("Por favor, digite um valor válido.")
+            if valor_input.strip() == "":
+                st.error("Por favor, preencha o valor.")
             else:
-                valor_final = float(apenas_numeros) / 100.0
-                aba.append_row([data, descricao, categoria, valor_final])
-                st.success(f"Gasto de R$ {valor_final:.2f} salvo com sucesso!")
-                st.rerun()
+                try:
+                    # Troca a vírgula por ponto automaticamente para o Python calcular certo
+                    valor_formatado = valor_input.replace(',', '.')
+                    valor_final = float(valor_formatado)
+                    
+                    aba.append_row([data, descricao, categoria, valor_final])
+                    st.success(f"Gasto de R$ {valor_final:.2f} salvo com sucesso!")
+                    st.rerun()
+                except ValueError:
+                    st.error("Valor numérico inválido! Use apenas números e vírgula (Ex: 15,50).")
 
 with tab_historico:
     st.subheader("Gerenciar Lançamentos")
@@ -69,7 +75,6 @@ with tab_historico:
     colunas_exibicao = ["Data", "Descrição", "Categoria", "Valor (R$)"]
     
     if not df.empty:
-        # st.data_editor com configuração de colunas para garantir os centavos e categorias restritas
         df_editado = st.data_editor(
             df[colunas_exibicao], 
             num_rows="dynamic", 
