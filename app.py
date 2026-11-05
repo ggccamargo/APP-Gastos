@@ -9,6 +9,9 @@ import plotly.express as px
 st.set_page_config(page_title="Controle de Gastos", page_icon="📊", layout="wide")
 st.title("Controle e Identificação de Gastos 📊")
 
+# --- UNIFICAÇÃO DAS CATEGORIAS ---
+CATEGORIAS = ["Casa", "Crianças", "Alimentação", "Carro", "Compras", "Viagens"]
+
 # --- CONEXÃO COM O GOOGLE SHEETS ---
 @st.cache_resource
 def conectar_planilha():
@@ -44,44 +47,46 @@ with tab_novo:
         col1, col2 = st.columns(2)
         with col1:
             data = st.date_input("Data", datetime.today()).strftime("%d/%m/%Y")
-            categoria = st.selectbox("Categoria", [
-                "Casa", 
-                "Crianças", 
-                "Alimentação", 
-                "Carro", 
-                "Compras", 
-                "Viagens"
-            ])
+            categoria = st.selectbox("Categoria", CATEGORIAS)
         with col2:
-            # Novo campo de texto preparado para ler os dois últimos dígitos como centavos
-            valor_input = st.text_input("Valor (Ex: digite 1500 para R$ 15,00)")
             descricao = st.text_input("Descrição")
+            valor_input = st.text_input("Valor (Digite apenas os números, ex: 1500 para R$ 15,00)")
             
         if st.form_submit_button("Salvar Gasto"):
-            try:
-                # Remove letras, pontos ou vírgulas se o usuário digitar sem querer
-                apenas_numeros = ''.join(filter(str.isdigit, str(valor_input)))
-                
-                if apenas_numeros == "":
-                    st.error("Por favor, digite um valor válido.")
-                else:
-                    # A mágica dos centavos: divide por 100
-                    valor_final = float(apenas_numeros) / 100.0
-                    
-                    aba.append_row([data, descricao, categoria, valor_final])
-                    st.success(f"Gasto de R$ {valor_final:.2f} salvo com sucesso!")
-                    st.rerun()
-            except Exception as e:
-                st.error("Erro ao formatar o valor. Tente digitar apenas os números.")
+            apenas_numeros = ''.join(filter(str.isdigit, str(valor_input)))
+            if apenas_numeros == "":
+                st.error("Por favor, digite um valor válido.")
+            else:
+                valor_final = float(apenas_numeros) / 100.0
+                aba.append_row([data, descricao, categoria, valor_final])
+                st.success(f"Gasto de R$ {valor_final:.2f} salvo com sucesso!")
+                st.rerun()
 
 with tab_historico:
     st.subheader("Gerenciar Lançamentos")
-    st.write("Edite valores, corrija textos ou clique na lixeira para excluir uma linha.")
+    st.write("Edite valores, corrija textos ou exclua linhas clicando na lixeira à esquerda.")
     
     colunas_exibicao = ["Data", "Descrição", "Categoria", "Valor (R$)"]
     
     if not df.empty:
-        df_editado = st.data_editor(df[colunas_exibicao], num_rows="dynamic", use_container_width=True)
+        # st.data_editor com configuração de colunas para garantir os centavos e categorias restritas
+        df_editado = st.data_editor(
+            df[colunas_exibicao], 
+            num_rows="dynamic", 
+            use_container_width=True,
+            column_config={
+                "Valor (R$)": st.column_config.NumberColumn(
+                    "Valor (R$)",
+                    format="R$ %.2f",
+                    min_value=0.0
+                ),
+                "Categoria": st.column_config.SelectboxColumn(
+                    "Categoria",
+                    options=CATEGORIAS,
+                    required=True
+                )
+            }
+        )
         
         if st.button("💾 Salvar Alterações", type="primary"):
             aba.clear()
@@ -113,14 +118,13 @@ with tab_dashboard:
             
             st.divider()
             
-            # NOVO GRÁFICO DE PIZZA
             resumo_cat = df_filtrado.groupby('Categoria')['Valor (R$)'].sum().reset_index()
             fig = px.pie(
                 resumo_cat, 
                 values='Valor (R$)', 
                 names='Categoria', 
                 title="Distribuição por Categoria",
-                hole=0.4, # Deixa com um visual de rosca moderno (Donut Chart)
+                hole=0.4,
                 color_discrete_sequence=px.colors.qualitative.Pastel
             )
             fig.update_traces(textposition='inside', textinfo='percent+label')
